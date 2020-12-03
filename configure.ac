@@ -18,6 +18,13 @@ AM_INIT_AUTOMAKE([1.11])
 AC_PROG_CC
 AM_PROG_CC_C_O
 
+m4_ifdef([PKG_PROG_PKG_CONFIG], [
+    PKG_PROG_PKG_CONFIG()
+], [
+    pkg_m4_absent=1
+    m4_warning([configure is generated without pkg.m4. 'make dist' target will be disabled.])
+])
+
 # Required by hwloc scripts
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -201,7 +208,14 @@ AS_VAR_POPDEF([CACHEVAR])dnl
 ])dnl AX_CHECK_COMPILE_FLAGS
 
 AC_ARG_ENABLE(unicode, [AS_HELP_STRING([--enable-unicode], [enable Unicode support])], ,enable_unicode="yes")
-if test "x$enable_unicode" = xyes; then
+AS_IF([ test "x$enable_unicode" = xyes ], [
+   AS_IF([ test -n "$PKG_CONFIG"], [
+      PKG_CHECK_MODULES([NCURSES], [ncursesw], [
+         CPPFLAGS="$NCURSES_CFLAGS $CFLAGS"
+         LIBS="$NCURSES_LIBS $LIBS"
+         AC_DEFINE([HAVE_LIBNCURSESW], 1, [The library is present.])
+      ])
+   ], [
    HTOP_CHECK_SCRIPT([ncursesw6], [addnwstr], [HAVE_LIBNCURSESW], "ncursesw6-config",
     HTOP_CHECK_SCRIPT([ncursesw], [addnwstr], [HAVE_LIBNCURSESW], "ncursesw6-config",
      HTOP_CHECK_SCRIPT([ncursesw], [addnwstr], [HAVE_LIBNCURSESW], "ncursesw5-config",
@@ -217,7 +231,15 @@ if test "x$enable_unicode" = xyes; then
       [AC_CHECK_HEADERS([ncurses/ncurses.h],[:],
          [AC_CHECK_HEADERS([ncurses/curses.h],[:],
             [AC_CHECK_HEADERS([ncurses.h],[:],[missing_headers="$missing_headers $ac_header"])])])])
-else
+   ])
+], [
+   AS_IF([ test -n "$PKG_CONFIG"], [
+      PKG_CHECK_MODULES([NCURSES], [ncurses], [
+         CPPFLAGS="$NCURSES_CFLAGS $CFLAGS"
+         LIBS="$NCURSES_LIBS $LIBS"
+         AC_DEFINE([HAVE_LIBNCURSES], 1, [The library is present.])
+      ])
+   ], [
    HTOP_CHECK_SCRIPT([ncurses6], [refresh], [HAVE_LIBNCURSES], "ncurses6-config",
     HTOP_CHECK_SCRIPT([ncurses], [refresh], [HAVE_LIBNCURSES], "ncurses5-config",
      HTOP_CHECK_LIB([ncurses6],  [refresh], [HAVE_LIBNCURSES],
@@ -229,7 +251,8 @@ else
       [AC_CHECK_HEADERS([ncurses/curses.h],[:],
          [AC_CHECK_HEADERS([ncurses/ncurses.h],[:],
             [AC_CHECK_HEADERS([ncurses.h],[:],[missing_headers="$missing_headers $ac_header"])])])])
-fi
+   ])
+])
 
 if test "$my_htop_platform" = "freebsd"; then
    AC_CHECK_LIB([kvm], [kvm_open], [], [missing_libraries="$missing_libraries libkvm"])
@@ -294,15 +317,12 @@ AC_ARG_ENABLE(delayacct, [AS_HELP_STRING([--enable-delayacct], [enable Linux del
 if test "x$enable_delayacct" = xyes
 then
    m4_ifdef([PKG_PROG_PKG_CONFIG], [
-      PKG_PROG_PKG_CONFIG()
       PKG_CHECK_MODULES(LIBNL3, libnl-3.0, [], [missing_libraries="$missing_libraries libnl-3"])
       PKG_CHECK_MODULES(LIBNL3GENL, libnl-genl-3.0, [], [missing_libraries="$missing_libraries libnl-genl-3"])
       CFLAGS="$CFLAGS $LIBNL3_CFLAGS $LIBNL3GENL_CFLAGS"
       LIBS="$LIBS $LIBNL3_LIBS $LIBNL3GENL_LIBS"
       AC_DEFINE(HAVE_DELAYACCT, 1, [Define if delay accounting support should be enabled.])
    ], [
-      pkg_m4_absent=1
-      m4_warning([configure is generated without pkg.m4. 'make dist' target will be disabled.])
       AC_MSG_ERROR([htop on Linux requires pkg-config for checking delayacct requirements. Please install pkg-config and run ./autogen.sh to rebuild the configure script.])
    ])
 fi
